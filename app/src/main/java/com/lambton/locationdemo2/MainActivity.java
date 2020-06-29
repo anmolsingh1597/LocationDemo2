@@ -1,13 +1,16 @@
 package com.lambton.locationdemo2;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.TextView;
@@ -18,6 +21,7 @@ import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
 
@@ -60,6 +64,17 @@ public class MainActivity extends AppCompatActivity {
 //        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
 
         permissionsToRequest = permissionsToRequest(permissions);
+
+        if (permissionsToRequest.size() > 0){
+            requestPermissions(permissionsToRequest.toArray(new String[permissionsToRequest.size()]), REQUEST_CODE);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        fusedLocationProviderClient.removeLocationUpdates(locationCallback);
     }
 
     private List<String> permissionsToRequest(List<String> permissions) {
@@ -120,6 +135,51 @@ public class MainActivity extends AppCompatActivity {
             locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
             locationRequest.setInterval(UPDATE_INTERVAL);
             locationRequest.setFastestInterval(FASTEST_INTERVAL);
+
+            locationCallback = new LocationCallback() {
+                @Override
+                public void onLocationResult(LocationResult locationResult) {
+                    super.onLocationResult(locationResult);
+
+                    if (locationResult != null){
+                        Location location = locationResult.getLastLocation();
+                        location_tv.setText(String.format("Lat: %s, Long: %s", location.getLatitude(), location.getLongitude()));
+                    }
+                }
+            };
+
+            fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, null);
         }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == REQUEST_CODE){
+            for (String perm: permissions) {
+                if (!hasPermission(perm));
+                permissionsRejected.add(perm);
+            }
+
+            if (permissionsRejected.size() > 0) {
+                if (shouldShowRequestPermissionRationale(permissionsRejected.get(0))) {
+                    new AlertDialog.Builder(MainActivity.this)
+                            .setMessage("Location permission is mandatory")
+                            .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+                                        requestPermissions(permissionsRejected.toArray(new String[permissionsRejected.size()]), REQUEST_CODE);
+                                    }
+
+                                }
+                            }) .setNegativeButton("Cancel", null)
+                            .create()
+                            .show();
+                }
+            }
+        }
+
     }
+}
 
